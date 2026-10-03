@@ -1,0 +1,37 @@
+########## Azure Cost Management - ActualCost, resource group ai-lab-rg ##########
+Source: ARM API Microsoft.CostManagement/query (type=ActualCost, MonthToDate, Daily granularity)
+Captured: 2026-10-03
+
+Subscription : <redacted>  ("Azure for Students")
+ResourceGroup: ai-lab-rg   (location: malaysiawest)
+
+UsageDate  | ResourceGroup | PreTaxCost (USD)
+-----------+---------------+-----------------
+2026-10-02 | ai-lab-rg     |     0.224831
+2026-10-03 | ai-lab-rg     |     0.108861
+-----------+---------------+-----------------
+TOTAL month-to-date:      0.333692 USD
+
+The two rows above are the values returned by a successful query. Note the
+Cost Management API aggressively rate-limits (HTTP 429) when queried repeatedly
+in a short window, so re-running the query may need a pause between calls:
+
+  az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv
+  curl -s -H "Authorization: Bearer $TOKEN" \
+    "https://management.azure.com/subscriptions/<SUB_ID>/providers/Microsoft.CostManagement/query?api-version=2023-03-01" \
+    -H "Content-Type: application/json" \
+    -d '{"type":"ActualCost","timeframe":"MonthToDate","dataset":{"granularity":"Daily","aggregation":{"totalCost":{"name":"Cost","function":"Sum"}},"grouping":[{"type":"Dimension","name":"ResourceGroup"}]}}'
+
+Interpretation
+--------------
+Total spend for the whole lab so far is ~$0.33 USD. The VM ran for roughly
+1.5-2 hours across the two days, consistent with the README's ~$0.05/hour
+estimate (Malaysia West pricing, Standard_B2s_v2 + Standard public IP).
+
+Because this is an "Azure for Students" subscription (a credit-based offer)
+rather than pay-as-you-go, the figures above are drawn from a small credit
+balance rather than a billing account; the Portal path to reproduce this
+screenshot is:
+
+  Azure Portal -> Cost Management + Billing -> Cost analysis
+                 -> Add filter: Resource group = ai-lab-rg

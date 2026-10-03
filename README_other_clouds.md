@@ -138,16 +138,49 @@ Viết một script Python (ví dụ `benchmark.py`) thực hiện:
 
 | Metric | Kết quả |
 |---|---|
-| Thời gian load data | |
-| Thời gian training | |
-| Best iteration | |
-| AUC-ROC | |
-| Accuracy | |
-| F1-Score | |
-| Precision | |
-| Recall | |
-| Inference latency (1 row) | |
-| Inference throughput (1000 rows) | |
+| Thời gian load data | **1.070 s** (143.84 MB → 134.4 MB/s) |
+| Thời gian training | **8.644 s** (400 cây, 2 vCPU) |
+| Best iteration | **400** (chọn bằng 5-fold cross-validation) |
+| AUC-ROC | **0.940221** |
+| Accuracy | **0.988413** |
+| F1-Score | **0.210526** |
+| Precision | **0.119241** |
+| Recall | **0.897959** |
+| Inference latency (1 row) | **0.708 ms** |
+| Inference throughput (1000 rows) | **93.574 rows/s** (10.687 ms / batch 1000) |
+
+**Môi trường đã dùng:** VM `Standard_B2s_v2` (MalaysiaWest) · Ubuntu 24.04 LTS · Python 3.12.3 · lightgbm 4.6.0 · scikit-learn 1.5.2 · pandas 2.2.3 · numpy 2.1.3
+
+**Ba điểm PHẢI LƯU Ý khi làm đúng bài này** (đều đã kiểm chứng trên chính dataset này):
+
+1. **Bỏ cột `Time`.** Đây là timestamp thô, không mang tín hiệu dự đoán. 5-fold CV: **0.897** không có `Time` vs **0.880** có `Time`.
+
+2. **Bắt buộc `is_unbalance=True`.** Dataset chỉ có **0.1727%** gian lận (492/284.807). Không cân bằng class thì LightGBM học trên ~400 mẫu dương và overfit rất nhanh.
+
+3. **Không dùng early stopping trên một validation split nhỏ.** Split đó chỉ có **~79 mẫu gian lận**, nên AUC quá nhiễu. Tệ hơn nữa: trên dataset này AUC **sụp xuống dưới 0.5 ở vòng boosting thứ 2** dưới mọi cách cân bằng (không cân bằng: 0.686 · `is_unbalance`: 0.250 · `scale_pos_weight=100`: 0.113), và điều này lặp lại **giống hệt trên LightGBM 4.6.0 lẫn 4.7.0** — nên đây là đặc tính của dữ liệu, không phải bug thư viện. Early stopping vì thế chọn nhầm `best_iteration = 1`, tức model chỉ còn **1 cây**. Cách làm đúng: chọn `n_estimators` từ đường cong AUC trung bình của **5-fold cross-validation** (gộp ~395 mẫu dương).
+
+> **Lưu ý thêm:** AUC do chính LightGBM ghi vào lịch sử eval cũng không đáng tin trên dataset này (đường cong bị đóng băng ở một giá trị duy nhất từ vòng ~450 trở đi). Nên benchmark tự tính AUC bằng **sklearn** trên dự đoán thật.
+
+Kết quả sweep để chọn `n_estimators` (5-fold, AUC tự tính bằng sklearn):
+
+| n_estimators | 50 | 100 | 150 | 200 | 300 | **400** | 500 | 600 |
+|---|---|---|---|---|---|---|---|---|
+| Mean CV-AUC | 0.8732 | 0.8758 | 0.8795 | 0.8804 | 0.8811 | **0.8875** | 0.8875 | 0.8875 |
+
+> Mỗi fold được fit **đủ 600 cây** rồi lấy dự đoán tại từng mốc bằng `predict_proba(num_iteration=n)`, nên ba cột cuối bằng nhau là **bão hoà thật** (các cây 401–600 không cải thiện thêm) chứ không phải bị cắt. Đường cong tăng đều tới ~400 rồi phẳng, nên chọn **400** là điểm cuối cùng còn cải thiện — thêm cây chỉ tốn thời gian.
+
+**Screenshot output đầy đủ của `benchmark.py`:**
+
+![Output benchmark.py](screenshots/01-benchmark-output.png)
+
+**Sai lệch so với mô tả trong README:** VM thực tế là **`Standard_B2s_v2`** (2 vCPU / 8 GB) chứ không phải `Standard_B2s`, và nằm ở **MalaysiaWest** chứ không phải `eastus` — giá và quota khác nhau. Benchmark tự đọc thông tin này qua Azure IMDS nên các con số trong bảng là của đúng VM đã chạy.
+
+> **Về môi trường Python:** trên Ubuntu 24.04, `pip3 install` của cloud-init cài package vào `~/.local` (PEP 668) và CLI `kaggle` **không** có trong PATH (`/usr/local/bin/kaggle` là symlink hỏng trỏ tới venv rỗng `/opt/ml-env`). Để tái lập được, tạo venv với phiên bản ghim:
+> ```bash
+> python3 -m venv ~/ml-env
+> ~/ml-env/bin/pip install lightgbm==4.6.0 scikit-learn==1.5.2 pandas==2.2.3 numpy==2.1.3
+> ~/ml-env/bin/python benchmark.py
+> ```
 
 ---
 
@@ -161,10 +194,37 @@ ip -s link
 ```
 Hoặc xem trên **Azure Portal -> Virtual Machines -> ai-cpu-node -> Monitoring -> Metrics** (Percentage CPU, Network In/Out).
 
+**Kết quả đo được trên VM thực tế** (`Standard_B2s_v2`, Intel Xeon Platinum 8370C @ 2.80GHz):
+
+| Tài nguyên | Idle | Khi chạy `benchmark.py` |
+|---|---|---|
+| CPU | 0.5 – 7.6% | **95 – 100%** cả 2 vCPU (`python` dùng 200% CPU) |
+| RAM | 854 MiB / 7.8 GiB | ~1.25 GiB / 7.8 GiB (còn **6.9 GiB available**) |
+| Disk `/` | 4.7 GB / 29 GB (17%) | không đổi đáng kể |
+| Network `eth0` | — | RX ~845 MB · TX ~11 MB · 0 error · 0 dropped |
+
+Snapshot `top` lúc đang huấn luyện — tiến trình `python` chiếm **200.0% CPU** (đã dùng hết 2 core):
+
+![top khi huấn luyện](screenshots/02-resource-under-load.png)
+
+Thông tin chi tiết phần cứng, `free -h`, `df -h` và `ip -s link`:
+
+![Resource usage](screenshots/03-resource-usage.png)
+
+**Azure Monitor Metrics** (PT5M, Average — lấy qua ARM API `microsoft.insights/metrics`): CPU **peak 73.6%**, mean 29.8%. Lưu ý metric `Network In/Out Total` trả về 0 với kích thước VM/vùng này, nên bằng chứng network được lấy từ `ip -s link` ở trên.
+
+![Azure Monitor metrics](screenshots/04-azure-monitor-metrics.png)
+
 ### 5.2: Billing / Cost Management
 1. Vào **Azure Portal -> Cost Management + Billing -> Cost analysis**.
 2. Lọc theo Resource Group `ai-lab-rg`, xem chi phí phát sinh hôm nay.
 3. Chụp màn hình.
+
+Có thể lấy số liệu trực tiếp bằng API thay vì click trên Portal:
+
+```bash
+az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv
+```
 
 **Ước tính chi phí/giờ (East US):**
 
@@ -173,6 +233,26 @@ Hoặc xem trên **Azure Portal -> Virtual Machines -> ai-cpu-node -> Monitoring
 | VM — CPU Node | `Standard_B2s` | ~$0.0416 |
 | Public IP (Standard) | | ~$0.005 |
 | **Tổng ước tính** | | **~$0.05/giờ** |
+
+**Chi phí thực tế đã phát sinh** (Resource group `ai-lab-rg`, MalaysiaWest, VM `Standard_B2s_v2`):
+
+| UsageDate | ResourceGroup | PreTaxCost (USD) |
+|---|---|---|
+| 2026-10-02 | ai-lab-rg | 0.224831 |
+| 2026-10-03 | ai-lab-rg | 0.108861 |
+| **Tổng month-to-date** | | **0.333692** |
+
+Khớp với ước tính ~$0.05/giờ ở trên.
+
+![Azure Cost Management](screenshots/05-cost-management.png)
+
+> **Một khác biệt so với ước tính:** Public IP của VM này là **Static** (Standard SKU) nên **không** phát sinh phí theo giờ — chi phí thực tế chỉ đến từ VM. Ngoài ra VM chạy ở **MalaysiaWest** chứ không phải `eastus` nên giá mỗi giờ khác bảng ước tính.
+
+**Hạ tầng đã dựng** (xác minh bằng `az` CLI — VM, VNet, NSG, Public IP):
+
+![Hạ tầng Azure](screenshots/06-infra-summary.png)
+
+> **Least-privilege đã áp dụng:** NSG chỉ có **một** rule cho phép SSH port 22 từ một IP duy nhất (`<my-public-ip>/32`, đã redact). Không có rule nào mở `0.0.0.0/0`, và không mở port 8000 (vì không làm phụ lục GPU).
 
 ### 5.3: GPU usage (Tùy chọn)
 Chỉ áp dụng nếu bạn làm Phụ lục GPU + LLM. Kiểm tra bằng `nvidia-smi`.
@@ -187,6 +267,23 @@ Chỉ áp dụng nếu bạn làm Phụ lục GPU + LLM. Kiểm tra bằng `nvid
 5. File `cloud-init-cpu.yaml` đã dùng.
 6. Báo cáo ngắn (5-10 dòng) nhận xét kết quả.
 
+Các file tương ứng nằm trong thư mục `lab16-azure-results/` và `screenshots/`:
+
+| # | Deliverable | File |
+|---|---|---|
+| 1 | Terminal output của `benchmark.py` | `screenshots/01-benchmark-output.png` (bản gốc: `lab16-azure-results/benchmark_output.txt`) |
+| 2 | File kết quả | `lab16-azure-results/benchmark_result.json` |
+| 3 | Resource usage | `screenshots/02-resource-under-load.png`, `03-resource-usage.png`, `04-azure-monitor-metrics.png` |
+| 4 | Azure Cost Management | `screenshots/05-cost-management.png` (bản gốc: `lab16-azure-results/cost_data.txt`) |
+| 5 | cloud-init đã dùng | `cloud-init-cpu.yaml` |
+| 6 | Báo cáo nhận xét | `lab16-azure-results/REPORT.md` |
+| — | Script benchmark | `benchmark.py` |
+| — | Hạ tầng đã dựng | `screenshots/06-infra-summary.png` |
+
+**Báo cáo ngắn (nhận xét kết quả):**
+
+> LightGBM train trên CPU 2 vCPU rất nhanh: load 143.84 MB dataset trong **1.07 s** (134 MB/s) và huấn luyện 400 cây trong **8.64 s**, cho AUC-ROC **0.940** — cho thấy CPU nhỏ là hoàn toàn đủ cho bài toán tabular này, không cần GPU. Inference rất nhanh: **0.708 ms** cho 1 dòng và **~93.500 rows/s** theo lô. Điểm đáng chú ý nhất là **F1 chỉ 0.21 dù AUC 0.94**: đây không phải lỗi mà là hệ quả của việc dữ liệu chỉ có 492/284.807 gian lận (0.17%), khiến mô hình ưu tiên bỏ sót ít (Recall 0.898) hơn là báo động giả ít (Precision 0.119) tại ngưỡng 0.5; ngưỡng tối ưu F1 thực tế là 0.95. Ba bẫy khi làm lại lab này là: phải **bỏ cột `Time`**, phải bật **`is_unbalance=True`**, và **không được dùng early stopping** trên validation split nhỏ — vì AUC ở đây sụp xuống dưới 0.5 ngay ở vòng boosting thứ 2, khiến early stopping chọn nhầm `best_iteration = 1` và model chỉ còn 1 cây; cách đúng là chọn `n_estimators` bằng 5-fold cross-validation. Chi phí thực tế cho toàn bộ lab là **~$0.33**.
+
 ---
 
 ## A.Phần 7: Dọn dẹp tài nguyên (BẮT BUỘC)
@@ -194,6 +291,10 @@ Xóa cả Resource Group để chắc chắn không sót tài nguyên nào tính
 ```bash
 az group delete --name ai-lab-rg --yes --no-wait
 ```
+
+> **Đã thực hiện và xác minh** cho lab này: sau khi xoá, không còn VM nào trong subscription, Public IP đã giải phóng, port 22 trên IP cũ không còn phản hồi, và Resource Group biến mất khỏi danh sách.
+>
+> **Lưu ý quan trọng:** `--no-wait` trả về ngay nhưng Azure xoá theo thứ tự phụ thuộc — VM biến mất sau ~1 phút nhưng **Public IP Standard cần thêm ~5 phút** mới giải phóng xong. Phải poll lại sau khi xoá, nếu không sẽ tưởng tài nguyên vẫn còn đang tính phí.
 
 ---
 

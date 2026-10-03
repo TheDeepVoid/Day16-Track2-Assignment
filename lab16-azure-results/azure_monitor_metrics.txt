@@ -1,0 +1,29 @@
+########## Azure Monitor metrics - ai-cpu-node (PT5M, Average) ##########
+Source: ARM API microsoft.insights/metrics
+
+UTC    | CPU %  | AvailMem (MiB)
+--------------------------------------
+13:30  |      -  |       4948
+13:35  |    7.6  |       7338
+13:40  |    4.2  |       7287
+13:45  |    0.9  |       7274
+13:50  |    0.5  |       7280
+13:55  |   41.0  |       7046
+14:00  |   73.6  |       6895
+14:05  |   45.5  |       6938
+14:10  |   34.0  |       6852
+14:15  |   56.1  |       6971
+14:20  |   34.2  |       6888
+14:25  |      -  |          0
+14:30  |      -  |          0
+14:35  |      -  |          0
+14:40  |      -  |          0
+14:45  |      -  |          0
+14:50  |      -  |          0
+14:55  |      -  |          0
+
+CPU peak = 73.6%   mean = 29.8%   (10 samples x 5 min)
+
+Note: 'Network In/Out Total' returned 0 for this VM size/region via ARM;
+network traffic is instead evidenced by 'ip -s link' in resource_usage.txt
+(eth0 RX ~845 MB = dataset download, TX ~11 MB).

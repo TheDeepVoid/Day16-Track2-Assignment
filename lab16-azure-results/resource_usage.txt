@@ -1,0 +1,52 @@
+########## LAB 16 - Resource usage on ai-cpu-node ##########
+
+=== nproc ===
+2
+
+=== lscpu ===
+Architecture:                            x86_64
+CPU(s):                                  2
+Model name:                              Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      1
+CPU(s) scaling MHz:                      100%
+CPU max MHz:                             2800.0000
+CPU min MHz:                             800.0000
+
+=== free -h ===
+               total        used        free      shared  buff/cache   available
+Mem:           7.8Gi       854Mi       3.8Gi       4.0Mi       3.4Gi       6.9Gi
+Swap:             0B          0B          0B
+
+=== df -h / ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        29G  4.7G   24G  17% /
+
+=== ip -s link ===
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    RX:  bytes packets errors dropped  missed   mcast           
+        599033     957      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+        599033     957      0       0       0       0 
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 38:33:c5:fc:4f:8e brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+     845756528  388522      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+      12206061   94596      0       0       0       0 
+3: enP6315s1: <BROADCAST,MULTICAST,SLAVE,UP,LOWER_UP> mtu 1500 qdisc mq master eth0 state UP mode DEFAULT group default qlen 1000
+    link/ether 38:33:c5:fc:4f:8e brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+     860372072  633878      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+      12336223   96579      0       0       0       0 
+    altname enP6315p0s2
+
+=== top (idle) ===
+top - 14:24:06 up 51 min,  2 users,  load average: 0.02, 0.40, 0.61
+Tasks: 141 total,   1 running, 140 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.0 us,  0.0 sy,  0.0 ni,100.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+MiB Mem :   7937.4 total,   3899.0 free,    854.8 used,   3502.4 buff/cache     
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   7082.5 avail Mem 
+

@@ -1,0 +1,39 @@
+azureuser@lab:~$ # Azure Cost Management - ActualCost cho resource group ai-lab-rg
+azureuser@lab:~$ SUB=<your-subscription-id>
+azureuser@lab:~$ TOKEN=$(az account get-access-token --resource https://management.azure.com/ \
+      --query accessToken -o tsv)
+azureuser@lab:~$ SCOPE="/subscriptions/$SUB"
+azureuser@lab:~$ curl -s -H "Authorization: Bearer $TOKEN" \
+      "https://management.azure.com${SCOPE}/providers/Microsoft.CostManagement/query?api-version=2023-03-01" \
+      -H "Content-Type: application/json" \
+      -d '{"type":"ActualCost","timeframe":"MonthToDate","dataset":{"granularity":"Daily",
+           "aggregation":{"totalCost":{"name":"Cost","function":"Sum"}},
+           "grouping":[{"type":"Dimension","name":"ResourceGroup"}]}}'
+
+{
+  "properties": {
+    "columns": [
+      { "name": "Cost",          "type": "Number" },
+      { "name": "UsageDate",     "type": "Number" },
+      { "name": "ResourceGroup", "type": "String" },
+      { "name": "Currency",      "type": "String" }
+    ],
+    "rows": [
+      [ 0.224830931854169, 20261002, "ai-lab-rg", "USD" ],
+      [ 0.108860832,        20261003, "ai-lab-rg", "USD" ]
+    ]
+  },
+  "namespace": "Microsoft.CostManagement",
+  "type": "Microsoft.CostManagement/query"
+}
+
+azureuser@lab:~$ # Tổng hợp
+UsageDate  | ResourceGroup | PreTaxCost (USD)
+-----------+---------------+-----------------
+2026-10-02 | ai-lab-rg     |     0.224831
+2026-10-03 | ai-lab-rg     |     0.108861
+-----------+---------------+-----------------
+TOTAL month-to-date:      0.333692 USD
+
+azureuser@lab:~$ # Ước tính README: ~$0.05/giờ (East US) — thực tế Malaysia West
+azureuser@lab:~$ # Public IP là Static (Standard SKU) nên KHÔNG tính phí theo giờ.

@@ -1,0 +1,37 @@
+########## LAB 16 - Azure infrastructure as built ##########
+
+Subscription : Azure for Students
+Sub ID       : <redacted>
+Tenant       : a431f2ef-be25-4b07-a55c-b3b8e4eef21d
+
+=== Resource groups ===
+Name                                                      Location
+--------------------------------------------------------  ------------
+ai-lab-rg                                                 malaysiawest
+NetworkWatcherRG                                          malaysiawest
+defaultresourcegroup-eus                                  malaysiawest
+MA_defaultazuremonitorworkspace-eus_malaysiawest_managed  malaysiawest
+=== VM ===
+Name         Size             Os     Provisioning
+-----------  ---------------  -----  --------------
+ai-cpu-node  Standard_B2s_v2  Linux  Succeeded
+=== VNet / Subnet ===
+[
+  {
+    "prefix": [
+      "10.0.0.0/24"
+    ],
+    "subnets": [
+      "ai-lab-subnet"
+    ],
+    "vnet": "ai-lab-vnet"
+  }
+]
+=== NSG rules (least privilege) ===
+Name               Priority    Access    Source              DestPort    Protocol
+-----------------  ----------  --------  ------------------  ----------  ----------
+allow-ssh-from-me  100         Allow     <my-public-ip>/32   22          Tcp
+=== Public IP ===
+Name                 Ip              Sku     Size
+-------------------  --------------  ------  --------
+ai-cpu-nodePublicIP  <vm-ip>  Static  Standard
