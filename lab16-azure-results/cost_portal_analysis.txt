@@ -1,0 +1,50 @@
+Azure Cost Management - Cost Analysis (Azure Portal, giao diện web)
+Nguồn: Azure Portal -> Cost Management + Billing -> Cost analysis
+Chụp lúc: 2026-10-04
+
+Metric / Setting                         Value
+---------------------------------------  ---------------------------------
+Billing Account Scope                    <billing-account-name> View
+Accumulated Costs
+  Time Period                            Oct 2026
+  Actual Cost (USD)                      $0.45
+  Forecast                               Unavailable (--)
+  Budget                                 None
+  Granularity                            Accumulated
+
+Cost Breakdown by Service Name            Cost (USD)
+---------------------------------------  -------------
+Storage                                      $0.21
+Virtual Network                               $0.15
+Virtual Machines                              $0.09
+Azure Monitor                                <$0.01
+Bandwidth                                    <$0.01
+
+Cost Breakdown by Location and SubscriptionCategory
+---------------------------------------  -------------
+Location: my west  (Malaysia West)        $0.45
+Subscription: Azure for Students...        $0.45
+
+GHI CHÚ
+-------
+1. Billing account / tên chủ tài khoản đã redact (repo public).
+2. Con so $0.45 nay KHONG duoc so truc tiep voi $0.333692 trong
+   cost_terminal_capture.txt, vi hai so do o hai scope khac nhau:
+     - $0.45   : toan subscription (billing account scope), Oct 2026 month-to-date
+     - $0.333692: chi resource group ai-lab-rg, duoc chay API ngay 2026-10-03
+3. Phan bo $0.45 cho thay co ca tai nguyen KHONG thuoc lab:
+   - Storage $0.21  : gan nhat chac la managed Log Analytics workspace
+                      (MA_defaultazuremonitorworkspace-..._managed), do Azure
+                      tu tao de luu du lieu Azure Monitor. Resource group cua lab
+                      (ai-lab-rg) khong co storage account nao.
+   - Azure Monitor / Bandwidth <$0.01 : cung thuoc he thong.
+   - Virtual Network $0.15: dung lien quan den lab (VNet + public IP Standard).
+   - Virtual Machines $0.09: VM ai-cpu-node cua lab.
+4. Azure tinh hoa don truc hop (accrual), du lieu 24-72 gio gan nhat
+   van la provisional va SE bi tinh lai khi usage data da hoan tat.
+   Do do so luc 2026-10-03 (API) va so luc 2026-10-04 (Portal) khac nhau
+   la binh thuong, khong phai sai so.
+5. Tai thoi diem chup, resource group ai-lab-rg da bi xoa (Part 7), nen
+   khong con chi phi lab nao phat sinh them. So $0.45 con lai la:
+   (a) chi phi lab da phat sinh trong thang 10 + (b) tai nguyen he thong
+   cua Azure van ton tai ngoai lab.

@@ -234,19 +234,31 @@ az account get-access-token --resource https://management.azure.com/ --query acc
 | Public IP (Standard) | | ~$0.005 |
 | **Tổng ước tính** | | **~$0.05/giờ** |
 
-**Chi phí thực tế đã phát sinh** (Resource group `ai-lab-rg`, MalaysiaWest, VM `Standard_B2s_v2`):
+**Chi phí thực tế đã phát sinh** — từ Azure Cost Management API (`ActualCost`, `MonthToDate`, `Daily`), truy vấn 2026-10-04, đối chiếu với ảnh Cost Analysis trên Portal:
 
-| UsageDate | ResourceGroup | PreTaxCost (USD) |
+| Metric / Setting | Value |
+|---|---|
+| Time Period | Oct 2026 |
+| **Actual Cost (USD)** | **0.450525** |
+| Forecast | Unavailable (`--`) · Budget: None |
+| Location | Malaysia West · Subscription: Azure for Students |
+
+| Resource Group | Service | Cost (USD) |
 |---|---|---|
-| 2026-10-02 | ai-lab-rg | 0.224831 |
-| 2026-10-03 | ai-lab-rg | 0.108861 |
-| **Tổng month-to-date** | | **0.333692** |
+| `ai-lab-rg` | Storage | 0.210267 |
+| `ai-lab-rg` | Virtual Network | 0.150435 |
+| `ai-lab-rg` | Virtual Machines | 0.086834 |
+| `ai-lab-rg` | Bandwidth | 0.000001 |
+| `defaultresourcegroup-eus` | Azure Monitor | 0.002989 |
+| **Tổng** | | **0.450525** |
 
-Khớp với ước tính ~$0.05/giờ ở trên.
+**99.3% (0.447537 USD) phát sinh trong `ai-lab-rg`**; 0.002989 USD còn lại là Azure Monitor trong `defaultresourcegroup-eus`, không thuộc lab. Các dòng lớn đều thuộc resource group của lab: Virtual Machines (compute `ai-cpu-node`), Virtual Network (VNet + Public IP Standard), Storage (managed disk của VM). Tổng này tương ứng khoảng **9 giờ** VM theo mức ~$0.05/giờ trong bảng ước tính.
 
-![Azure Cost Management](screenshots/05-cost-management.png)
+> **Lưu ý về accrual:** Azure tính hóa đơn theo cơ chế accrual, dữ liệu 24–72 giờ gần nhất là *provisional* và được tính lại. Truy vấn ngày 2026-10-03 cho hai ngày 02–03-10 cho tổng `ai-lab-rg` là 0.333692 USD; truy vấn lại ngày 2026-10-04 cho cùng hai ngày đó là 0.447536 USD. Số liệu ở trên là lần truy vấn đầy đủ và khớp chính xác với tổng $0.45 trên Portal.
 
-> **Một khác biệt so với ước tính:** Public IP của VM này là **Static** (Standard SKU) nên **không** phát sinh phí theo giờ — chi phí thực tế chỉ đến từ VM. Ngoài ra VM chạy ở **MalaysiaWest** chứ không phải `eastus` nên giá mỗi giờ khác bảng ước tính.
+![Azure Cost Analysis — Portal](screenshots/05-cost-management.png)
+
+> **Một khác biệt so với ước tính:** Public IP của VM này là **Static** (Standard SKU) nên **không** phát sinh phí IP theo giờ; chi phí tính ra đến từ VM, managed disk và tài nguyên mạng đi kèm. Ngoài ra VM chạy ở **MalaysiaWest** chứ không phải `eastus` nên giá mỗi giờ khác bảng ước tính.
 
 **Hạ tầng đã dựng** (xác minh bằng `az` CLI — VM, VNet, NSG, Public IP):
 
@@ -274,7 +286,7 @@ Các file tương ứng nằm trong thư mục `lab16-azure-results/` và `scree
 | 1 | Terminal output của `benchmark.py` | `screenshots/01-benchmark-output.png` (bản gốc: `lab16-azure-results/benchmark_output.txt`) |
 | 2 | File kết quả | `lab16-azure-results/benchmark_result.json` |
 | 3 | Resource usage | `screenshots/02-resource-under-load.png`, `03-resource-usage.png`, `04-azure-monitor-metrics.png` |
-| 4 | Azure Cost Management | `screenshots/05-cost-management.png` (bản gốc: `lab16-azure-results/cost_data.txt`) |
+| 4 | Azure Cost Management | `screenshots/05-cost-management.png` (ảnh chụp Portal — nguồn chính) — bản gốc: `lab16-azure-results/cost_portal_analysis.txt`, `cost_terminal_capture.txt`, `cost_data.txt` |
 | 5 | cloud-init đã dùng | `cloud-init-cpu.yaml` |
 | 6 | Báo cáo nhận xét | `lab16-azure-results/REPORT.md` |
 | — | Script benchmark | `benchmark.py` |
@@ -282,7 +294,7 @@ Các file tương ứng nằm trong thư mục `lab16-azure-results/` và `scree
 
 **Báo cáo ngắn (nhận xét kết quả):**
 
-> LightGBM train trên CPU 2 vCPU rất nhanh: load 143.84 MB dataset trong **1.07 s** (134 MB/s) và huấn luyện 400 cây trong **8.64 s**, cho AUC-ROC **0.940** — cho thấy CPU nhỏ là hoàn toàn đủ cho bài toán tabular này, không cần GPU. Inference rất nhanh: **0.708 ms** cho 1 dòng và **~93.500 rows/s** theo lô. Điểm đáng chú ý nhất là **F1 chỉ 0.21 dù AUC 0.94**: đây không phải lỗi mà là hệ quả của việc dữ liệu chỉ có 492/284.807 gian lận (0.17%), khiến mô hình ưu tiên bỏ sót ít (Recall 0.898) hơn là báo động giả ít (Precision 0.119) tại ngưỡng 0.5; ngưỡng tối ưu F1 thực tế là 0.95. Ba bẫy khi làm lại lab này là: phải **bỏ cột `Time`**, phải bật **`is_unbalance=True`**, và **không được dùng early stopping** trên validation split nhỏ — vì AUC ở đây sụp xuống dưới 0.5 ngay ở vòng boosting thứ 2, khiến early stopping chọn nhầm `best_iteration = 1` và model chỉ còn 1 cây; cách đúng là chọn `n_estimators` bằng 5-fold cross-validation. Chi phí thực tế cho toàn bộ lab là **~$0.33**.
+> LightGBM train trên CPU 2 vCPU rất nhanh: load 143.84 MB dataset trong **1.07 s** (134 MB/s) và huấn luyện 400 cây trong **8.64 s**, cho AUC-ROC **0.940** — cho thấy CPU nhỏ là hoàn toàn đủ cho bài toán tabular này, không cần GPU. Inference rất nhanh: **0.708 ms** cho 1 dòng và **~93.500 rows/s** theo lô. Điểm đáng chú ý nhất là **F1 chỉ 0.21 dù AUC 0.94**: đây không phải lỗi mà là hệ quả của việc dữ liệu chỉ có 492/284.807 gian lận (0.17%), khiến mô hình ưu tiên bỏ sót ít (Recall 0.898) hơn là báo động giả ít (Precision 0.119) tại ngưỡng 0.5; ngưỡng tối ưu F1 thực tế là 0.95. Ba bẫy khi làm lại lab này là: phải **bỏ cột `Time`**, phải bật **`is_unbalance=True`**, và **không được dùng early stopping** trên validation split nhỏ — vì AUC ở đây sụp xuống dưới 0.5 ngay ở vòng boosting thứ 2, khiến early stopping chọn nhầm `best_iteration = 1` và model chỉ còn 1 cây; cách đúng là chọn `n_estimators` bằng 5-fold cross-validation. **Chi phí:** tổng **0.450525 USD** cho tháng 10 ở phạm vi toàn subscription, trong đó **99.3% (0.447537 USD) thuộc resource group `ai-lab-rg`** của lab — Virtual Machines 0.086834, Virtual Network 0.150435, Storage 0.210267 (managed disk); chỉ 0.002989 USD là Azure Monitor trong `defaultresourcegroup-eus`. Tương đương khoảng 9 giờ VM theo mức ~$0.05/giờ ước tính.
 
 ---
 
